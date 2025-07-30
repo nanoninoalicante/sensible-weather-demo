@@ -1,14 +1,4 @@
 {
-  "build": {
-    "env": {
-      "NITRO_PRESET": "vercel"
-    }
-  },
-  "functions": {
-    "app/**": {
-      "maxDuration": 10
-    }
-  },
   "headers": [
     {
       "source": "/Roobert-Font/(.*)",
