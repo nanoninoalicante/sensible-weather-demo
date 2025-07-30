@@ -6,13 +6,12 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss'
   ],
   
-  // Explicitly set Vercel preset (optional - auto-detected)
+  // Enable static generation for Vercel
   nitro: {
+    static: true,
     preset: 'vercel'
   },
   
-  // Ensure we're using universal rendering (SSR) - this is the default
-  ssr: true,
   
   // Add font preloading for critical fonts
   app: {
@@ -43,17 +42,9 @@ export default defineNuxtConfig({
     }
   },
   
-  // Optimized route rules for Vercel
+  // All routes prerendered for static site
   routeRules: {
-    // Homepage - prerendered at build time (static file)
-    '/': { 
-      prerender: true,
-      headers: { 'cache-control': 's-maxage=31536000' } // 1 year cache
-    },
-    // Popup page - SSR for dynamic query processing
-    '/popup': { 
-      ssr: true,
-      headers: { 'cache-control': 's-maxage=60' } // 1 minute cache
-    }
+    '/': { prerender: true },
+    '/popup': { prerender: true }  // Static instead of SSR
   }
 })
