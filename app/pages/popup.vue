@@ -1,6 +1,20 @@
 <template>
   <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-    <div class="max-w-2xl w-full">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="max-w-2xl w-full">
+      <div class="bg-white rounded-lg shadow-2xl overflow-hidden p-12">
+        <div class="flex flex-col items-center justify-center space-y-6">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[rgb(12,66,97)]"></div>
+          <div class="text-center space-y-2">
+            <h3 class="text-lg font-semibold text-gray-900">Loading Weather Data</h3>
+            <p class="text-gray-600">Preparing your weather guarantee details...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div v-else class="max-w-2xl w-full">
       <!-- Main Modal -->
       <div class="bg-white rounded-lg shadow-2xl overflow-hidden relative">
         <!-- Header -->
@@ -238,16 +252,21 @@
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
+import { useRoute } from "vue-router";
 
-// Sample weather guarantee data
-const weatherData = reactive({
+const route = useRoute();
+
+// Loading state
+const isLoading = ref(true);
+
+// Default weather guarantee data
+const defaultWeatherData = {
   plain_language: {
     details: {
       action: "Add",
@@ -313,6 +332,87 @@ const weatherData = reactive({
       link: "https://www.sensibleweather.com/legal/sensible-weather-privacy-policy",
     },
   ],
+};
+
+// Initialize weatherData with default values
+const weatherData = reactive({ ...defaultWeatherData });
+
+// Base64 encode/decode helper functions
+const encodeBase64 = (str) => {
+  if (typeof window !== 'undefined') {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+  // For server-side rendering
+  return Buffer.from(str, 'utf8').toString('base64');
+};
+
+const decodeBase64 = (str) => {
+  try {
+    if (typeof window !== 'undefined') {
+      return decodeURIComponent(escape(atob(str)));
+    }
+    // For server-side rendering
+    return Buffer.from(str, 'base64').toString('utf8');
+  } catch (error) {
+    console.warn('Failed to decode base64 string:', error);
+    return null;
+  }
+};
+
+// Helper function for deep merging objects
+const mergeDeep = (target, source) => {
+  const result = { ...target };
+  
+  for (const key in source) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      result[key] = mergeDeep(result[key] || {}, source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  
+  return result;
+};
+
+// Function to load data from Base64 encoded query parameter
+const loadDataFromQuery = async () => {
+  try {
+    // Small delay to show loading state and prevent flicker
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Check for Base64 encoded JSON data in query parameter
+    if (route.query.data) {
+      const decodedJson = decodeBase64(route.query.data);
+      if (decodedJson) {
+        const queryData = JSON.parse(decodedJson);
+        
+        // Deep merge the query data with existing weatherData
+        Object.assign(weatherData, mergeDeep(weatherData, queryData));
+        console.log('Successfully loaded weather data from Base64 query string');
+      }
+    }
+    
+    // Also support individual parameters for simple overrides
+    if (route.query.title) {
+      weatherData.plain_language.details.title = route.query.title;
+    }
+    
+    if (route.query.price) {
+      weatherData.plain_language.details.suggested_price = route.query.price;
+    }
+    
+  } catch (error) {
+    console.warn('Failed to parse weather data from query string:', error);
+    // Fallback to default data (already loaded)
+  } finally {
+    // Always set loading to false when done
+    isLoading.value = false;
+  }
+};
+
+// Load data from query parameters when component mounts
+onMounted(async () => {
+  await loadDataFromQuery();
 });
 
 const closeModal = () => {
@@ -324,12 +424,22 @@ const addGuarantee = () => {
 };
 
 const loadSampleData = () => {
-  // You can modify the data here to test different scenarios
-  weatherData.plain_language.details.title =
-    "Get Reimbursed for Bad Weather (Updated!)";
-  weatherData.plain_language.details.suggested_price =
-    "Add a Weather Guarantee for $5.25/day";
-  weatherData.plain_language.details.suggested_price_total = "$10.50 total";
-  alert("Sample data updated! Notice the title and pricing changes.");
+  // Example of loading custom data directly
+  const customData = {
+    plain_language: {
+      details: {
+        title: "Premium Weather Protection (Live Demo)",
+        suggested_price: "Add a Weather Guarantee for $12.99",
+        suggested_price_total: "$25.98 total",
+        summary_tiers: ["2+ hours of rain = $150.00/day"],
+        summary_times: "Rain between 8:00 AM and 8:00 PM each day.",
+        summary_body: "Enhanced rain protection with premium coverage for your outdoor activities."
+      }
+    }
+  };
+  
+  // Update the data directly for demo purposes
+  Object.assign(weatherData, mergeDeep(weatherData, customData));
+  alert("Sample data updated! Use the home page to generate Base64 URLs.");
 };
 </script>
