@@ -1,8 +1,65 @@
 <template>
   <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
     <div class="max-w-2xl w-full">
+      <!-- Loading State -->
+      <div v-if="isLoading" class="bg-white rounded-lg shadow-2xl overflow-hidden relative">
+        <!-- Loading Header -->
+        <div class="bg-[rgb(12,66,97)] px-36 py-12 text-white text-center relative">
+          <div class="animate-pulse">
+            <div class="h-8 bg-white bg-opacity-20 rounded mb-8 mx-auto w-3/4"></div>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full mx-auto"></div>
+          </div>
+        </div>
+        
+        <!-- Loading Content -->
+        <div class="p-8 space-y-10">
+          <div class="space-y-6 text-center animate-pulse">
+            <div class="h-6 bg-gray-200 rounded mx-auto w-2/3"></div>
+            <div class="h-4 bg-gray-200 rounded mx-auto w-full"></div>
+            <div class="bg-gray-200 h-16 rounded-lg"></div>
+          </div>
+          <div class="space-y-6 animate-pulse">
+            <div class="h-6 bg-gray-200 rounded mx-auto w-1/2"></div>
+            <div class="h-4 bg-gray-200 rounded mx-auto w-full"></div>
+            <div class="bg-gray-200 h-16 rounded-lg"></div>
+          </div>
+          <div class="space-y-4 animate-pulse">
+            <div class="h-6 bg-gray-200 rounded mx-auto w-1/3"></div>
+            <div class="grid grid-cols-3 gap-4">
+              <div class="h-20 bg-gray-200 rounded-lg"></div>
+              <div class="h-20 bg-gray-200 rounded-lg"></div>
+              <div class="h-20 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="!hasValidData" class="bg-white rounded-lg shadow-2xl overflow-hidden relative">
+        <div class="bg-red-500 px-36 py-12 text-white text-center relative">
+          <button
+            @click="closeModal"
+            class="absolute top-4 right-4 text-white hover:text-gray-200 text-2xl font-bold"
+          >
+            ×
+          </button>
+          <h1 class="text-3xl font-bold mb-8">No Weather Data Found</h1>
+          <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full mx-auto flex items-center justify-center">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="p-8 text-center">
+          <p class="text-gray-700 mb-6">This popup requires valid weather data in the URL parameters.</p>
+          <NuxtLink to="/" class="bg-[rgb(12,66,97)] text-white px-6 py-3 rounded-lg font-medium hover:bg-[rgb(8,45,66)] transition duration-200">
+            Go Back to Generate URL
+          </NuxtLink>
+        </div>
+      </div>
+
       <!-- Main Modal -->
-      <div class="bg-white rounded-lg shadow-2xl overflow-hidden relative">
+      <div v-else class="bg-white rounded-lg shadow-2xl overflow-hidden relative">
         <!-- Header -->
         <div
           class="bg-[rgb(12,66,97)] px-36 py-12 text-white text-center relative"
@@ -243,7 +300,7 @@
 </template>
 
 <script setup>
-import { reactive } from "vue";
+import { reactive, ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 
 const route = useRoute();
@@ -317,8 +374,12 @@ const defaultWeatherData = {
   ],
 };
 
-// Initialize weatherData with default values
-const weatherData = reactive({ ...defaultWeatherData });
+// Loading and data states
+const isLoading = ref(true);
+const hasValidData = ref(false);
+
+// Initialize weatherData as empty initially (no default data shown)
+const weatherData = reactive({});
 
 // Base64 encode/decode helper functions (works on both server and client)
 const encodeBase64 = (str) => {
@@ -361,38 +422,56 @@ const mergeDeep = (target, source) => {
   return result;
 };
 
-// Process data from Base64 encoded query parameter (runs server-side and client-side)
-const processQueryData = () => {
+// Process data from Base64 encoded query parameter (client-side only)
+const processQueryData = async () => {
   try {
+    let dataFound = false;
+    
     // Check for Base64 encoded JSON data in query parameter
     if (route.query.data) {
       const decodedJson = decodeBase64(route.query.data);
       if (decodedJson) {
         const queryData = JSON.parse(decodedJson);
         
-        // Deep merge the query data with existing weatherData
-        Object.assign(weatherData, mergeDeep(weatherData, queryData));
+        // Set the weather data directly
+        Object.assign(weatherData, queryData);
+        dataFound = true;
         console.log('Successfully loaded weather data from Base64 query string');
       }
     }
     
     // Also support individual parameters for simple overrides
-    if (route.query.title) {
-      weatherData.plain_language.details.title = route.query.title;
+    if (route.query.title || route.query.price) {
+      if (!dataFound) {
+        // Use default structure if no base64 data but individual params exist
+        Object.assign(weatherData, defaultWeatherData);
+      }
+      
+      if (route.query.title) {
+        weatherData.plain_language.details.title = route.query.title;
+      }
+      
+      if (route.query.price) {
+        weatherData.plain_language.details.suggested_price = route.query.price;
+      }
+      
+      dataFound = true;
     }
     
-    if (route.query.price) {
-      weatherData.plain_language.details.suggested_price = route.query.price;
-    }
+    hasValidData.value = dataFound;
     
   } catch (error) {
     console.warn('Failed to parse weather data from query string:', error);
-    // Fallback to default data (already loaded)
+    hasValidData.value = false;
+  } finally {
+    isLoading.value = false;
   }
 };
 
-// Process query data immediately during setup (server-side and client-side)
-processQueryData();
+// Process query data on client-side mount
+onMounted(() => {
+  processQueryData();
+});
 
 const closeModal = () => {
   alert("Modal would close in real implementation");
