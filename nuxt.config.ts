@@ -5,6 +5,12 @@ export default defineNuxtConfig({
   modules: [
     '@nuxtjs/tailwindcss'
   ],
+  
+  // Explicitly set Vercel preset (optional - auto-detected)
+  nitro: {
+    preset: 'vercel'
+  },
+  
   // Ensure we're using universal rendering (SSR) - this is the default
   ssr: true,
   
@@ -37,11 +43,17 @@ export default defineNuxtConfig({
     }
   },
   
-  // Optional: Add route rules for optimization
+  // Optimized route rules for Vercel
   routeRules: {
-    // Homepage can be prerendered at build time since it's static
-    '/': { prerender: true },
-    // Popup page uses SSR for dynamic query parameter processing
-    '/popup': { ssr: true }
+    // Homepage - prerendered at build time (static file)
+    '/': { 
+      prerender: true,
+      headers: { 'cache-control': 's-maxage=31536000' } // 1 year cache
+    },
+    // Popup page - SSR for dynamic query processing
+    '/popup': { 
+      ssr: true,
+      headers: { 'cache-control': 's-maxage=60' } // 1 minute cache
+    }
   }
 })

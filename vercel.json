@@ -1,0 +1,23 @@
+{
+  "build": {
+    "env": {
+      "NITRO_PRESET": "vercel"
+    }
+  },
+  "functions": {
+    "app/**": {
+      "maxDuration": 10
+    }
+  },
+  "headers": [
+    {
+      "source": "/Roobert-Font/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+} 
