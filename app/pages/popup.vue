@@ -1,20 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-    <!-- Loading State -->
-    <div v-if="isLoading" class="max-w-2xl w-full">
-      <div class="bg-white rounded-lg shadow-2xl overflow-hidden p-12">
-        <div class="flex flex-col items-center justify-center space-y-6">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[rgb(12,66,97)]"></div>
-          <div class="text-center space-y-2">
-            <h3 class="text-lg font-semibold text-gray-900">Loading Weather Data</h3>
-            <p class="text-gray-600">Preparing your weather guarantee details...</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Content -->
-    <div v-else class="max-w-2xl w-full">
+    <div class="max-w-2xl w-full">
       <!-- Main Modal -->
       <div class="bg-white rounded-lg shadow-2xl overflow-hidden relative">
         <!-- Header -->
@@ -257,13 +243,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { reactive } from "vue";
 import { useRoute } from "vue-router";
 
 const route = useRoute();
-
-// Loading state
-const isLoading = ref(true);
 
 // Default weather guarantee data
 const defaultWeatherData = {
@@ -337,22 +320,26 @@ const defaultWeatherData = {
 // Initialize weatherData with default values
 const weatherData = reactive({ ...defaultWeatherData });
 
-// Base64 encode/decode helper functions
+// Base64 encode/decode helper functions (works on both server and client)
 const encodeBase64 = (str) => {
-  if (typeof window !== 'undefined') {
+  if (import.meta.server) {
+    // Server-side (Node.js)
+    return Buffer.from(str, 'utf8').toString('base64');
+  } else {
+    // Client-side (browser)
     return btoa(unescape(encodeURIComponent(str)));
   }
-  // For server-side rendering
-  return Buffer.from(str, 'utf8').toString('base64');
 };
 
 const decodeBase64 = (str) => {
   try {
-    if (typeof window !== 'undefined') {
+    if (import.meta.server) {
+      // Server-side (Node.js)
+      return Buffer.from(str, 'base64').toString('utf8');
+    } else {
+      // Client-side (browser)
       return decodeURIComponent(escape(atob(str)));
     }
-    // For server-side rendering
-    return Buffer.from(str, 'base64').toString('utf8');
   } catch (error) {
     console.warn('Failed to decode base64 string:', error);
     return null;
@@ -374,12 +361,9 @@ const mergeDeep = (target, source) => {
   return result;
 };
 
-// Function to load data from Base64 encoded query parameter
-const loadDataFromQuery = async () => {
+// Process data from Base64 encoded query parameter (runs server-side and client-side)
+const processQueryData = () => {
   try {
-    // Small delay to show loading state and prevent flicker
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
     // Check for Base64 encoded JSON data in query parameter
     if (route.query.data) {
       const decodedJson = decodeBase64(route.query.data);
@@ -404,16 +388,11 @@ const loadDataFromQuery = async () => {
   } catch (error) {
     console.warn('Failed to parse weather data from query string:', error);
     // Fallback to default data (already loaded)
-  } finally {
-    // Always set loading to false when done
-    isLoading.value = false;
   }
 };
 
-// Load data from query parameters when component mounts
-onMounted(async () => {
-  await loadDataFromQuery();
-});
+// Process query data immediately during setup (server-side and client-side)
+processQueryData();
 
 const closeModal = () => {
   alert("Modal would close in real implementation");
